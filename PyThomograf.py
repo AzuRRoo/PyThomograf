@@ -4,37 +4,40 @@ from skimage.io import imread
 from skimage.color import rgb2gray
 from skimage.draw import line_nd
 
-# Wczytaj obraz PNG
-image = imread("Kropka.jpg")
+image = imread("Kolo.jpg")
 
-# Konwersja do skali szarości, jeśli obraz jest kolorowy
 if len(image.shape) == 3:
     image = rgb2gray(image)
 
+height, width = image.shape[:2]
+
+r = np.sqrt(height**2 + width**2) / 2
+
 scan_1d_values = []
-for i in range(0,np.size(image[0])):
-    start=(0,i)
-    end=(np.size(image[0]),i)
-    rr,cc = line_nd(start,end)
-    Values=image[rr,cc]
-    Intensity=np.sum(Values)
-    scan_1d_values.append(Intensity)
 
-scan_1d_values = np.array(scan_1d_values)
+for j in range(0, 181):
+    emitter_scan = []
+    for i in range(0, 91):
+        start = (r * np.cos(np.radians(i + j)), r * np.sin(np.radians(i + j)))
+        end = (r * np.cos(np.radians(i + j)), r * np.sin(np.radians(-1*i + 180 + j)))
 
-#scan_1d = np.sum(image, axis=0)
+        rr, cc = line_nd(start, end)
+        rr = np.clip(rr, 0, height - 1)
+        cc = np.clip(cc, 0, width - 1)
 
-# Wyświetlenie oryginalnego obrazu
+        Values = image[rr, cc]
+        Intensity = np.sum(Values)
+
+        emitter_scan.append(Intensity)
+
+    scan_1d_values.append(emitter_scan)
+
+#scan_1d_values = np.array(scan_1d_values).T  # Transponowanie macierzy
+
 plt.figure(figsize=(10, 5))
-plt.subplot(1, 2, 1)
-plt.imshow(image, cmap="gray")
-plt.title("Oryginalny obraz")
-plt.axis("off")
-
-# Wyświetlenie wyniku skanowania 1D
-plt.subplot(1, 2, 2)
-plt.plot(scan_1d_values)
-plt.title("Skan 1D (projekcja pionowa)")
-plt.xlabel("Pozycja detektora")
-plt.ylabel("Suma wartości pikseli")
+plt.imshow(scan_1d_values, cmap='gray', aspect='auto', origin='lower')
+plt.title("Sinogram")
+plt.xlabel("Pozycja detektora (kąty)")
+plt.ylabel("Pozycja detektora (projekcje)")
+plt.colorbar(label="Suma wartości pikseli")
 plt.show()
