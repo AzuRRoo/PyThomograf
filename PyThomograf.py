@@ -10,26 +10,43 @@ if len(image.shape) == 3:
     image = rgb2gray(image)
 
 height, width = image.shape[:2]
-
-r = np.sqrt(height**2 + width**2) / 2
-
+print(f"Obraz: wysokość={height}, szerokość={width}")
+print(f"Lewy górny róg: (0, 0)")
+print(f"Prawy górny róg: (0, {width-1})")
+print(f"Lewy dolny róg: ({height-1}, 0)")
+print(f"Prawy dolny róg: ({height-1}, {width-1})")
+r = 2*np.sqrt(height**2 + width**2) / 4
+centerx = width // 2
+centery = height // 2
+print(r)
 scan_1d_values = []
-
+i=90
 for j in range(0, 181):
     emitter_scan = []
-    for i in range(0, 91):
-        start = (r * np.cos(np.radians(i + j)), r * np.sin(np.radians(i + j)))
-        end = (r * np.cos(np.radians(i + j)), r * np.sin(np.radians(-1*i + 180 + j)))
+    #for i in range(0, 91):
+    start = (r * np.cos(np.radians(i + j))+centerx, r * np.sin(np.radians(i + j))+centery)
+    end = (r * (-1*np.cos(np.radians(i +j))),r * (-1*np.sin(np.radians(i + j))))
 
-        rr, cc = line_nd(start, end)
-        rr = np.clip(rr, 0, height - 1)
-        cc = np.clip(cc, 0, width - 1)
+    rr, cc = line_nd(start, end)
+    #print(start,end)
+    rr = np.clip(rr, 0, height - 1)
+    cc = np.clip(cc, 0, width - 1)
 
-        Values = image[rr, cc]
-        Intensity = np.sum(Values)
+    Values = image[rr, cc]
+    Intensity = np.sum(Values)
 
-        emitter_scan.append(Intensity)
+    emitter_scan.append(Intensity)
+    image_copy = np.copy(image)
 
+    # Rysujemy linię na kopii obrazu
+    image_copy[rr, cc] = 1  # Zmieniamy wartość pikseli linii na biały (dla obrazów w skali szarości)
+
+    # Wyświetlamy obraz z aktualną linią
+    plt.imshow(image_copy, cmap="gray")
+    plt.title(f"Linia dla j={j}")
+    plt.axis("off")
+    plt.pause(0.1)  # Krótka pauza, aby zobaczyć zmianę
+    plt.clf()
     scan_1d_values.append(emitter_scan)
 
 #scan_1d_values = np.array(scan_1d_values).T  # Transponowanie macierzy
