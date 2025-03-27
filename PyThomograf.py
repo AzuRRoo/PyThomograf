@@ -5,7 +5,7 @@ from skimage.color import rgb2gray
 from skimage.draw import line_nd
 from skimage.color import gray2rgb
 
-image = imread("Kropka.jpg")
+image = imread("SADDLE_PE.JPG")
 
 if len(image.shape) == 3:
     image = rgb2gray(image)
@@ -22,18 +22,11 @@ centery = height // 2
 print(r)
 scan_1d_values = []
 iloscEm=181
-for j in range(0, 381):
+for j in range(0, 361):
     emitter_scan = []
     image_copy = gray2rgb(image)
     for i in range(0, iloscEm):
         pos=(i-iloscEm/2)/2
-        #emitterPos=((i%2)*2-1)*i
-        #if i%2==0:
-        #     start = (r * np.cos(np.radians(i/2 + j))+centerx, r * np.sin(np.radians(i/2 + j))+centery)
-        #     end = (r * (-1*np.cos(np.radians(-i/2 +j)))+centerx,r * (-1*np.sin(np.radians(-i/2 + j)))+centery)
-        # else:
-        #     start = (r * np.cos(np.radians(-i/2 + j))+centerx, r * np.sin(np.radians(-i/2 + j))+centery)
-        #     end = (r * (-1*np.cos(np.radians(i/2 +j)))+centerx,r * (-1*np.sin(np.radians(i/2 + j)))+centery)
         start = (r * np.cos(np.radians(pos + j))+centerx, r * np.sin(np.radians(pos + j))+centery)
         end = (r * (-1*np.cos(np.radians(-pos +j)))+centerx,r * (-1*np.sin(np.radians(-pos + j)))+centery)
         rr, cc = line_nd(start, end)
@@ -50,11 +43,6 @@ for j in range(0, 381):
         else:
             image_copy[rr, cc] = [255,255,255]
 
-
-    #Rysujemy linię na kopii obrazu
-      # Zmieniamy wartość pikseli linii na biały (dla obrazów w skali szarości)
-
-    #Wyświetlamy obraz z aktualną linią
     plt.imshow(image_copy, cmap="gray")
     plt.title(f"Linia dla j={j}")
     plt.axis("off")
