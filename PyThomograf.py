@@ -3,14 +3,11 @@ import matplotlib.pyplot as plt
 from skimage.io import imread
 from skimage.color import rgb2gray
 from skimage.color import gray2rgb
-import time
 import copy
 import math
 import os
 import tkinter as tk
 from tkinter import ttk
-from tkinter import messagebox
-from scipy.fft import fft, ifft, fftfreq
 import pydicom
 from tkinter import filedialog
 import datetime
@@ -20,7 +17,7 @@ from datetime import datetime
 from pydicom.uid import SecondaryCaptureImageStorage
 import pydicom
 from pydicom.dataset import Dataset, FileDataset
-
+from sklearn.metrics import mean_squared_error
 
 def Bresenham(x0,y0,x1,y1):
     dx = abs(x1 - x0)
@@ -45,22 +42,26 @@ def Bresenham(x0,y0,x1,y1):
 
     return zip(*points)
 
-def rekonstruct(image_empty, sinogram, alpha, r, centerx, centery, filter, steps, n, l):
-    """
-    Rekonstruuje obraz na podstawie sinogramu metodą backprojection.
-    
-    Parametry:
-    image_empty - pusty obraz (tablica o zadanych wymiarach)
-    sinogram - sinogram jako macierz 2D (wymiary: [liczba_kątów, liczba_detektorów])
-    alfa - kąt między kolejnymi projekcjami (w stopniach, zazwyczaj 1)
-    liczbaEm - liczba detektorów/emiterów (np. 181)
-    r - promień (odległość emiterów/detektorów od środka obrazu)
-    centerx, centery - współrzędne środka obrazu
-    
-    Zwraca:
-    Zrekonstruowany obraz (normalizowany do 0-255, typu uint8).
-    """ 
+def bladSrednioKwadratowy(RMSEList,image_empty,image):
+    normImage = image_empty.copy()
+    normImage -= np.min(normImage)
+    if np.max(normImage) != 0:
+        normImage /= np.max(normImage)
+    normImage *= 255
+    normImage = normImage.astype(np.uint8)
+
+    mse = mean_squared_error(image.flatten(), normImage.flatten())
+    rmse = np.sqrt(mse)
+    RMSEList.append(rmse)
+    return RMSEList
+def rekonstruct(image_empty, sinogram, alpha, r, centerx, centery, filter, steps, n, l,image):
+
     liczbaEm = n
+    if filter:
+        RMSEListFiltered = []
+    else:
+        RMSEList = []
+
     if(filter):
         filtered_sinogram = []
         for projection in sinogram:
@@ -74,12 +75,11 @@ def rekonstruct(image_empty, sinogram, alpha, r, centerx, centery, filter, steps
         plt.colorbar(label="Suma wartości pikseli")
         plt.show()
         filtered_sinogram = np.array(filtered_sinogram)
-           # liczba kątów (np. 181)
         sinogram = filtered_sinogram
     num_angles = sinogram.shape[0]
     
     for j in range(num_angles):
-        angle = j * alpha # przy alfa=1, kąt = j stopni
+        angle = j * alpha 
         for i in range(liczbaEm):
             # Obliczanie pozycji sensora
             # pos = (i - liczbaEm / 2) / 2
@@ -104,6 +104,14 @@ def rekonstruct(image_empty, sinogram, alpha, r, centerx, centery, filter, steps
             
             # Backprojection: dodajemy wartość z sinogramu do wszystkich punktów linii
             image_empty[rr, cc] += sinogram[j, i]
+        
+        #Liczenie bledu sredniokwadratowego
+        if filter:
+            RMSEListFiltered = bladSrednioKwadratowy(RMSEListFiltered,image_empty,image)
+        else:
+            RMSEList = bladSrednioKwadratowy(RMSEList,image_empty,image)
+        
+
         if steps:
             plt.imshow(image_empty, cmap='gray')
             plt.title(f"Krok pośredni rekonstrukcji: kąt {j * alpha}°")
@@ -115,26 +123,10 @@ def rekonstruct(image_empty, sinogram, alpha, r, centerx, centery, filter, steps
     if np.max(image_empty) != 0:
         image_empty /= np.max(image_empty)
     image_empty *= 255
-    
-    return image_empty.astype(np.uint8)
-
-def ram_lak_filter(projection):
-    n = len(projection)
-    
-    # Apply FFT
-    proj_fft = fft(projection)
-    freqs = fftfreq(n)
-
-    # Create Ram-Lak filter in freq domain
-    filter_kernel = np.abs(freqs)
-
-    # Apply filter in frequency domain
-    filtered_fft = proj_fft * filter_kernel
-
-    # Inverse FFT to get filtered projection
-    filtered_projection = np.real(ifft(filtered_fft))
-    
-    return filtered_projection
+    if filter:
+        return image_empty.astype(np.uint8),RMSEListFiltered
+    else: 
+        return image_empty.astype(np.uint8),RMSEList
         
 def filtr(sinogram):
     hardcoded = len(sinogram)#do poprawy edycji 
@@ -155,7 +147,6 @@ def filtr(sinogram):
 
     mask /= np.sum(np.abs(mask))
 
-    # filtered = np.zeros(len(sinogram))
     filtered = np.convolve(sinogram, mask, mode='same')
     return filtered
 
@@ -216,7 +207,10 @@ def createSinogram(image, centerx,centery,height,width,r, filter,steps,n,l,alpha
 
     image_empty = np.zeros((image.shape[0],image.shape[1]),dtype=float)
     copy2 = copy.deepcopy(image)
-    copy2 = rekonstruct(image_empty, np.array(scan_1d_values), 1, r, centerx, centery, filter, steps,n,l)
+    if filter:
+        copy2,RMSEListFiltered = rekonstruct(image_empty, np.array(scan_1d_values), 1, r, centerx, centery, filter, steps,n,l,image)
+    else:
+        copy2,RMSEList = rekonstruct(image_empty, np.array(scan_1d_values), 1, r, centerx, centery, filter, steps,n,l,image)
     if dicom:
         saveDicom(copy2,filename = imageChoiceDicom.get())
     # plt.figure(figsize=(8, 8))
@@ -224,7 +218,10 @@ def createSinogram(image, centerx,centery,height,width,r, filter,steps,n,l,alpha
     plt.imshow(copy2,cmap="gray")
     plt.colorbar()
     plt.show()
-
+    if filter:
+        return RMSEListFiltered
+    else:
+        return RMSEList
 #KWADRATY
 # image = imread("Kolo.jpg")# ✅  
 # image = imread("Kropka.jpg")# ✅
@@ -239,6 +236,16 @@ def createSinogram(image, centerx,centery,height,width,r, filter,steps,n,l,alpha
 # image = imread("SADDLE_PE-large.jpg")#✅ Nieco wyblakle
 # image = imread("SADDLE_PE.jpg")#❌ -> caly czarny obraz
 
+def RMSEChart(RMSEList,Usefilter):
+    plt.plot(RMSEList)
+    plt.xlabel("Iteracja (kąt)")
+    plt.ylabel("Błąd średniokwadratowy (RMSE)")
+    if Usefilter:
+        plt.title("Zmiana błędu RMSE w czasie rekonstrukcji przy uzyciu filtrowanego sinogramu")
+    else:
+        plt.title("Zmiana błędu RMSE w czasie rekonstrukcji bez filtrowania sinogramu")
+    plt.show()
+
 def app(image, dicom=False):
     height,width = image.shape[:2]
     r = np.sqrt(height**2 + width**2) / 2
@@ -246,20 +253,21 @@ def app(image, dicom=False):
     centerx = (height // 2)-1
 
     alpha = alphaChoice.get()
-    #print(alpha)
 
     n = nChoice.get()#Liczba Emiterow
-    #print(n)
+
     l = lChoice.get()#Rozpietosc kątowa
-    #print(l)
 
     Usefilter = filterChoice.get()
-    #print(Usefilter)
 
     Showsteps = stepsChoice.get()
-    #print(Showsteps)
+    if Usefilter:
+        RMSEListFiltered = createSinogram(image,centerx,centery,height,width,r,Usefilter,Showsteps,n, l, alpha, dicom)
+        RMSEChart(RMSEListFiltered,Usefilter)
+    else:
+        RMSEList = createSinogram(image,centerx,centery,height,width,r,Usefilter,Showsteps,n, l, alpha, dicom)
+        RMSEChart(RMSEList,Usefilter)
 
-    createSinogram(image,centerx,centery,height,width,r,Usefilter,Showsteps,n, l, alpha, dicom)
 
 def loadImage():
     selected_filename = imageChoice.get()
@@ -273,6 +281,7 @@ def loadImage():
             app(image)
         except Exception as e:
             print("Error loading image:", e)
+
 def loadDicom():
     selected_filename = imageChoiceDicom.get()
     if selected_filename and selected_filename != "Select an image":
@@ -345,17 +354,6 @@ def saveDicom(image, filename):
     folderPath = "ReconstructedDicoms"
     fullFilePath = os.path.join(folderPath,filename)
     ds.save_as(fullFilePath, write_like_original=False)
-
-
-    # ds.AcquisitionDate = ""
-
-    # ds.StudyInstanceUID = pydicom.uid.generate_uid()
-    # ds.SeriesInstanceUID = pydicom.uid.generate_uid()
-    # ds.SOPInstanceUID = pydicom.uid.generate_uid()
-    # ds.SOPClassUID = SecondaryCaptureImageStorage
-
-    # ds.ContentDate = datetime.now().strftime("%Y%m%d")
-    # ds.ContentTime = time.strftime("%H%M%S")
     
 
 def readDicomData():
@@ -368,9 +366,12 @@ def readDicomData():
     patientAge = patientData.PatientAge
     patientGender = patientData.PatientSex
     patientID = patientData.PatientID
+    date = patientData.Date
+    formatted_date = f"{date[:4]}-{date[4:6]}-{date[6:]}"
     patientComments = patientData.ImageComments
 
     print("Informacje o badaniu:")
+    print("Data badania: ",formatted_date)
     print("Imie i nazwisko pacjenta: ",patientName)
     print("Wiek pacjenta: ",patientAge)
     print("Płeć pacjenta: ",patientGender)
@@ -403,9 +404,7 @@ def validateStringInput(P):
     if any(char.isdigit() for char in P):
         return False
     return True
-def show_date():
-    selected_date = calendar.get_date()
-    # print(f"Wybrana data: {selected_date}")
+
 
 root = tk.Tk()
 root.title("Symulacja tomografii komputerowej")
@@ -534,7 +533,7 @@ today = datetime.today()
 calendar = Calendar(dataFrame, selectmode='day', year=today.year, month=today.month, day=today.day)
 calendar.grid(row=4,column=1,padx=10,pady=5)
 
-button = tk.Button(dataFrame, text="Wybierz datę", command=show_date)
+button = tk.Button(dataFrame, text="Wybierz datę")
 button.grid(row=5,column=1,padx=10,pady=5)
 
 descriptionLabel = tk.Label(dataFrame, text="Komentarz:")
