@@ -2,7 +2,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 from skimage.io import imread
 from skimage.color import rgb2gray
-from skimage.draw import line_nd
 from skimage.color import gray2rgb
 import time
 import copy
@@ -11,8 +10,16 @@ import os
 import tkinter as tk
 from tkinter import ttk
 from tkinter import messagebox
-from skimage.transform import radon, iradon
 from scipy.fft import fft, ifft, fftfreq
+import pydicom
+from tkinter import filedialog
+import datetime
+import pydicom.uid
+from tkcalendar import Calendar
+from datetime import datetime
+from pydicom.uid import SecondaryCaptureImageStorage
+import pydicom
+from pydicom.dataset import Dataset, FileDataset
 
 
 def Bresenham(x0,y0,x1,y1):
@@ -37,32 +44,6 @@ def Bresenham(x0,y0,x1,y1):
 
 
     return zip(*points)
-
-
-
-#Musi dodac padding taki aby zamiast miec
-#Kolo z dedtektorami opisane na kwadracie aby bylo jakby wpisane w kwadrat wiekszy
-
-# def addPadding(image):
-#     #Obraz musi byc otoczony przez obwodke szeroka i wyskoa na dwa r minus jego aktualny wymiar
-    
-#     # max_dim = max(image.shape[0],image.shape[1])
-#     #result to obraz o wymiarach 2*r x 2*r
-#     result = np.zeros((2*int(r),2*int(r)),dtype=image.dtype)
-#     print("result shape: ",result.shape)
-#     #Teraz w sam srodek result musze wrzucic image
-#     x,y = (image.shape[0])//2,(image.shape[1])//2
-#     print("x,y: ",x,y)
-#     print("image shape: ",image.shape)
-#     z = x+image.shape[0]
-#     z2 = y+image.shape[1]
-#     print("z,z2: ",z,z2)
-#     result[int(r)-x:r-x+image.shape[0],r-y:y+image.shape[1]] = image
-    
-#     return result
-
-# def makeSquare():
-#     return np.zeros((2*int(r),2*int(r)))
 
 def rekonstruct(image_empty, sinogram, alpha, r, centerx, centery, filter, steps, n, l):
     """
@@ -178,7 +159,7 @@ def filtr(sinogram):
     filtered = np.convolve(sinogram, mask, mode='same')
     return filtered
 
-def createSinogram(image, centerx,centery,height,width,r, filter,steps,n,l,alpha):
+def createSinogram(image, centerx,centery,height,width,r, filter,steps,n,l,alpha,dicom):
 
     scan_1d_values = []
     liczbaEm=n
@@ -189,7 +170,6 @@ def createSinogram(image, centerx,centery,height,width,r, filter,steps,n,l,alpha
         for i in range(0, liczbaEm):#Polozenie jednego detektora dla danego ustawienia detektorow
             pos = (i*l/liczbaEm-l/2)
 
-            print("Pozycja detektora: ",pos)
             start = (r * np.cos(np.radians(pos + j))+centerx, r * np.sin(np.radians(pos + j))+centery)
             end = (r * (-1*np.cos(np.radians(-pos +j)))+centerx,r * (-1*np.sin(np.radians(-pos + j)))+centery)
             rr, cc = Bresenham(int(start[0]), int(start[1]), int(end[0]), int(end[1]))
@@ -237,7 +217,8 @@ def createSinogram(image, centerx,centery,height,width,r, filter,steps,n,l,alpha
     image_empty = np.zeros((image.shape[0],image.shape[1]),dtype=float)
     copy2 = copy.deepcopy(image)
     copy2 = rekonstruct(image_empty, np.array(scan_1d_values), 1, r, centerx, centery, filter, steps,n,l)
-
+    if dicom:
+        saveDicom(copy2,filename = imageChoiceDicom.get())
     # plt.figure(figsize=(8, 8))
 
     plt.imshow(copy2,cmap="gray")
@@ -258,29 +239,29 @@ def createSinogram(image, centerx,centery,height,width,r, filter,steps,n,l,alpha
 # image = imread("SADDLE_PE-large.jpg")#✅ Nieco wyblakle
 # image = imread("SADDLE_PE.jpg")#❌ -> caly czarny obraz
 
-def app(image):
+def app(image, dicom=False):
     height,width = image.shape[:2]
     r = np.sqrt(height**2 + width**2) / 2
     centery = (width // 2)-1
     centerx = (height // 2)-1
 
     alpha = alphaChoice.get()
-    print(alpha)
+    #print(alpha)
 
     n = nChoice.get()#Liczba Emiterow
-    print(n)
+    #print(n)
     l = lChoice.get()#Rozpietosc kątowa
-    print(l)
+    #print(l)
 
     Usefilter = filterChoice.get()
-    print(Usefilter)
+    #print(Usefilter)
 
     Showsteps = stepsChoice.get()
-    print(Showsteps)
+    #print(Showsteps)
 
-    createSinogram(image,centerx,centery,height,width,r,Usefilter,Showsteps,n, l, alpha)
+    createSinogram(image,centerx,centery,height,width,r,Usefilter,Showsteps,n, l, alpha, dicom)
 
-def load_image():
+def loadImage():
     selected_filename = imageChoice.get()
     if selected_filename and selected_filename != "Select an image":
         try:
@@ -290,94 +271,276 @@ def load_image():
             if len(image.shape) == 3:
                 image = rgb2gray(image)
             app(image)
-            # plt.imshow(image, cmap='gray')
-            # plt.title(selected_filename)
-            # plt.show()
+        except Exception as e:
+            print("Error loading image:", e)
+def loadDicom():
+    selected_filename = imageChoiceDicom.get()
+    if selected_filename and selected_filename != "Select an image":
+        try:
+            full_path = os.path.join("ImagesDicom", selected_filename)
+            dicom = pydicom.dcmread(full_path)
+            image = dicom.pixel_array.astype(float)
+            image = (np.maximum(image, 0) / image.max()) * 255.0
+
+            print(f"Image shape: {image.shape}")
+            if len(image.shape) == 3:
+                image = rgb2gray(image)
+            app(image, True)
         except Exception as e:
             print("Error loading image:", e)
 
+def saveDicom(image, filename):
+    fileMeta = Dataset()
+    fileMeta.MediaStorageSOPClassUID = SecondaryCaptureImageStorage
+    fileMeta.MediaStorageSOPInstanceUID = pydicom.uid.generate_uid()
+    fileMeta.TransferSyntaxUID = pydicom.uid.ExplicitVRLittleEndian
 
+    ds = FileDataset(None, {}, preamble=b"\0" * 128)
+    ds.file_meta = fileMeta
+
+    ds.is_little_endian = True
+    ds.is_implicit_VR = False
+
+
+    name = nameEntryData.get()
+    surname = surnameEntryData.get()
+    full_name = f"{surname}^{name}"
+    age = ageEntryData.get()
+    age_dicom = f"{int(age):03d}Y" if age.isdigit() else ""
+    gender = genderChoice.get()
+    gender_dicom = "M" if gender == "Mężczyzna" else "F" if gender == "Kobieta" else ""
+    date = calendar.get_date().replace("-", "")
+    date_parts = date.split('/')
+    formatted_date = f"20{date_parts[2]}{date_parts[0].zfill(2)}{date_parts[1].zfill(2)}"  # Format to 'YYYYMMDD'
+    comment = descriptionText.get("1.0", "end").strip()
+
+    ds.SOPClassUID = SecondaryCaptureImageStorage
+    ds.SOPInstanceUID = fileMeta.MediaStorageSOPInstanceUID
+    ds.PatientName = full_name
+    ds.PatientAge = age_dicom
+    ds.PatientSex = gender_dicom
+    ds.PatientID = "12345"
+    ds.ImageComments = comment
+    ds.Date = formatted_date
+    ds.Modality = "CT"
+    ds.SeriesInstanceUID = pydicom.uid.generate_uid()
+    ds.StudyInstanceUID = pydicom.uid.generate_uid()
+    ds.FrameOfReferenceUID = pydicom.uid.generate_uid()   
+
+
+    ds.BitsStored = 8
+    ds.BitsAllocated = 8
+    ds.SamplesPerPixel = 1
+    ds.HighBit = 7
+    ds.ImagesInAcquisition = 1
+    ds.InstanceNumber = 1
+
+    ds.Rows, ds.Columns = image.shape
+    ds.ImageType = r"ORIGINAL\PRIMARY\AXIAL"
+    ds.PhotometricInterpretation = "MONOCHROME2"
+    ds.PixelRepresentation = 0
+
+    pydicom.dataset.validate_file_meta(ds.file_meta, enforce_standard=True)
+    ds.PixelData = image.tobytes()
+    folderPath = "ReconstructedDicoms"
+    fullFilePath = os.path.join(folderPath,filename)
+    ds.save_as(fullFilePath, write_like_original=False)
+
+
+    # ds.AcquisitionDate = ""
+
+    # ds.StudyInstanceUID = pydicom.uid.generate_uid()
+    # ds.SeriesInstanceUID = pydicom.uid.generate_uid()
+    # ds.SOPInstanceUID = pydicom.uid.generate_uid()
+    # ds.SOPClassUID = SecondaryCaptureImageStorage
+
+    # ds.ContentDate = datetime.now().strftime("%Y%m%d")
+    # ds.ContentTime = time.strftime("%H%M%S")
+    
+
+def readDicomData():
+    filePath = filedialog.askopenfilename(
+        title="Select DICOM File",
+        filetypes=(("DICOM files", "*.dcm"), ("All files", "*.*"))
+    )
+    patientData = pydicom.dcmread(filePath)
+    patientName = patientData.PatientName
+    patientAge = patientData.PatientAge
+    patientGender = patientData.PatientSex
+    patientID = patientData.PatientID
+    patientComments = patientData.ImageComments
+
+    print("Informacje o badaniu:")
+    print("Imie i nazwisko pacjenta: ",patientName)
+    print("Wiek pacjenta: ",patientAge)
+    print("Płeć pacjenta: ",patientGender)
+    print("ID pacjenta: ",patientID)
+    print("Komentarz: ",patientComments)
+    plt.imshow(patientData.pixel_array,cmap="gray")
+    plt.show()
+    
+
+
+def switchToDicom():
+    dicomFrame.grid(row=1, column=0, padx=10, pady=10)
+    standardFrame.grid_forget()   
+
+def switchToStandard():
+    standardFrame.grid(row=1, column=0, padx=10, pady=10)
+    dicomFrame.grid_forget()
+
+def showDataEntry():
+    dataFrame.grid(row=2, column=10, padx=5,pady=5)
+
+def hideDataEntry():
+    dataFrame.grid_forget()
+
+def validateNumberInput(P):
+    if P == "" or P.isdigit():
+        return True
+    return False
+def validateStringInput(P):
+    if any(char.isdigit() for char in P):
+        return False
+    return True
+def show_date():
+    selected_date = calendar.get_date()
+    # print(f"Wybrana data: {selected_date}")
 
 root = tk.Tk()
 root.title("Symulacja tomografii komputerowej")
-root.geometry("500x400")
+root.geometry("1000x900")
 
+modeFrame = tk.Frame(root)
+modeFrame.grid(row=0, column=0, pady=10)
+
+tk.Button(modeFrame, text="Tryb klasyczny", command=switchToStandard).grid(row=0, column=0, padx=5)
+tk.Button(modeFrame, text="Tryb DICOM", command=switchToDicom).grid(row=0, column=1, padx=5)
+tk.Button(modeFrame, text="Odczytaj dane DICOM", command = readDicomData).grid(row=0,column=2,padx=5)
 
 images = ["Kolo.jpg", "Kropka.jpg", "Kwadraty2.jpg", "Paski2.jpg",
         "Shepp_logan.jpg", "CT_ScoutView-large.jpg", "CT_ScoutView.jpg",
         "SADDLE_PE-large.jpg", "SADDLE_PE.jpg"]
-
+imagesDicom = ["Kolo.dcm", "Kropka.dcm", "Kwadraty2.dcm", "Paski2.dcm",
+        "Shepp_logan.dcm", "CT_ScoutView-large.dcm", "CT_ScoutView.dcm",
+        "SADDLE_PE-large.dcm", "SADDLE_PE.dcm"]
 
 imageChoice = tk.StringVar()
+imageChoiceDicom = tk.StringVar()
 
-combo = ttk.Combobox(root, values = images, textvariable=imageChoice)
+standardFrame = tk.Frame(root)
+standardFrame.grid(row=1, column=0, padx=10, pady=10)
+
+dicomFrame = tk.Frame(root)
+dicomFrame.grid(row=2, column=0, padx=10, pady=10)
+dicomFrame.grid_forget() 
+
+combo = ttk.Combobox(standardFrame, values = images, textvariable=imageChoice)
 combo.set("Images")
-combo.pack(padx=10,pady=10)
+combo.grid(row=0, column=0, padx=10, pady=10)
 
+combo = ttk.Combobox(dicomFrame,values = imagesDicom, textvariable=imageChoiceDicom)
+combo.set("Dicom Images")
+combo.grid(row=0, column=0, padx=10, pady=10)
+
+btn = tk.Button(standardFrame, text="Załaduj obraz", command=loadImage)
+btn.grid(row=1, column=0, pady=5)
+
+
+btnDicom = tk.Button(dicomFrame, text="Załaduj plik DICOM", command=loadDicom)
+btnDicom.grid(row=1, column=0, pady=5)
+
+paramsFrame = tk.Frame(root)
+paramsFrame.grid(row=3, column=0, pady=10, rowspan=2)
 
 
 alphaChoice = tk.IntVar(value=1)
-alphaLabel = tk.Label(root, text="Alpha")
-alphaLabel.pack(padx=10,pady=1)
-alphaSlider = tk.Scale(root, variable=alphaChoice,from_=1,to_=10,orient="horizontal")
-alphaSlider.pack(padx=10,pady=1)
+alphaLabel = tk.Label(paramsFrame, text="Alpha")
+alphaLabel.grid(row=0, column=0, padx=10, pady=1)
+alphaSlider = tk.Scale(paramsFrame, variable=alphaChoice,from_=1,to_=10,orient="horizontal")
+alphaSlider.grid(row=0, column=1, padx=10, pady=1)
 
 
 nChoice = tk.IntVar(value=1)
-nLabel = tk.Label(root, text="Liczba detektorów")
-nLabel.pack(padx=10, pady=1)
-nSlider = tk.Scale(root,variable=nChoice,from_=1,to_=180,orient="horizontal")
-nSlider.pack(padx=10,pady=5)
+nLabel = tk.Label(paramsFrame, text="Liczba detektorów")
+nLabel.grid(row=1, column=0, padx=10, pady=1)
+nSlider = tk.Scale(paramsFrame,variable=nChoice,from_=1,to_=180,orient="horizontal")
+nSlider.grid(row=1, column=1, padx=10, pady=5)
 
 
 lChoice = tk.IntVar(value=1)
-lLabel = tk.Label(root, text="Rozpiętość kątowa")
-lLabel.pack(padx=10, pady=1)
-lSlider = tk.Scale(root,variable=lChoice,from_=1,to_=90,orient="horizontal")
-lSlider.pack(padx=10,pady=5)
+lLabel = tk.Label(paramsFrame, text="Rozpiętość kątowa")
+lLabel.grid(row=2, column=0, padx=10, pady=1)
+lSlider = tk.Scale(paramsFrame,variable=lChoice,from_=1,to_=90,orient="horizontal")
+lSlider.grid(row=2, column=1, padx=10, pady=5)
 
 filterChoice = tk.BooleanVar(value=False)
 
-filterCheckbox = ttk.Checkbutton(root, text="Filtr", variable=filterChoice)
-filterCheckbox.pack()
+filterCheckbox = ttk.Checkbutton(paramsFrame, text="Filtr", variable=filterChoice)
+filterCheckbox.grid(row=3, column=0, columnspan=2, padx=10, pady=5)
 
 stepsChoice = tk.BooleanVar(value=False)
+stepsCheckbox = ttk.Checkbutton(paramsFrame, text="Kroki Pośrednie", variable=stepsChoice)
+stepsCheckbox.grid(row=4, column=0, columnspan=2, padx=10, pady=5)
 
-stepsCheckbox = ttk.Checkbutton(root, text="Kroki Pośrednie", variable=stepsChoice)
-stepsCheckbox.pack()
+dataButton = tk.Button(dicomFrame, text="Wprowadź dane", command=showDataEntry)
+dataButton.grid(row=0, column=2, padx=10, pady=5)
 
+dataFrame = tk.Frame(dicomFrame)
+dataFrame.grid(row=4, column=10, padx=5, pady=5)
+dataFrame.grid_forget() 
 
-btn = tk.Button(root, text = "Choose image", command = load_image)
-btn.pack(padx=10,pady=10)
+nameLabelData = tk.Label(dataFrame, text="Imię:")
+nameLabelData.grid(row=0, column=0, padx=10, pady=5)
+
+vcmdName = (dataFrame.register(validateStringInput), '%P')
+
+nameEntryData = tk.Entry(dataFrame, validate="key",validatecommand=vcmdName)
+nameEntryData.grid(row=0, column=1, padx=10, pady=5)
+
+surnameLabelData = tk.Label(dataFrame, text="Nazwisko:")
+surnameLabelData.grid(row=1, column=0, padx=10, pady=5)
+
+vcmdSurname = (dataFrame.register(validateStringInput), '%P')
+
+surnameEntryData = tk.Entry(dataFrame, validate="key",validatecommand=vcmdSurname)
+surnameEntryData.grid(row=1, column=1, padx=10, pady=5)
+
+ageLabelData = tk.Label(dataFrame, text="Wiek:")
+ageLabelData.grid(row=2, column=0, padx=10, pady=5)
+
+vcmdAge = (dataFrame.register(validateNumberInput), '%P')
+
+ageEntryData = tk.Entry(dataFrame, validate="key",validatecommand=vcmdAge)
+ageEntryData.grid(row=2, column=1, padx=10, pady=5)
+
+genderChoice = tk.StringVar(value="")
+genderChoice.set(None)
+
+genderLabel = tk.Label(dataFrame,text="Płeć:")
+genderLabel.grid(row=3,column=0,padx=5)
+
+maleRadio = tk.Radiobutton(dataFrame, text="Mężczyzna", variable=genderChoice, value="Mężczyzna")
+maleRadio.grid(row=3, column=1, padx=5, sticky='w')
+
+femaleRadio = tk.Radiobutton(dataFrame, text="Kobieta", variable=genderChoice, value="Kobieta")
+femaleRadio.grid(row=3, column=1, padx=5, sticky='e')
+
+calendarLabelData = tk.Label(dataFrame,text = "Data badania:")
+calendarLabelData.grid(row=4,column=0,padx=10,pady=5)
+
+today = datetime.today()
+
+calendar = Calendar(dataFrame, selectmode='day', year=today.year, month=today.month, day=today.day)
+calendar.grid(row=4,column=1,padx=10,pady=5)
+
+button = tk.Button(dataFrame, text="Wybierz datę", command=show_date)
+button.grid(row=5,column=1,padx=10,pady=5)
+
+descriptionLabel = tk.Label(dataFrame, text="Komentarz:")
+descriptionLabel.grid(row=5, column=2, padx=10, pady=5)
+
+descriptionText = tk.Text(dataFrame, height=5, width=30)
+descriptionText.grid(row=6, column=2, padx=10, pady=5)
 
 root.mainloop()
-
-# image = image.get()
-# image = imread(image)
-
-# image_shape0 = image.shape[0]
-# image_shape1 = image.shape[1]
-
-
-
-# if len(image.shape) == 3:
-#     image = rgb2gray(image)
-# # print("DUPA: ",image.shape)
-# height,width = image.shape[:2]
-# # print(f"Obraz: wysokość={height}, szerokość={width}")
-# # print(f"Lewy górny róg: (0, 0)")
-# # print(f"Prawy górny róg: (0, {width-1})")
-# # print(f"Lewy dolny róg: ({height-1}, 0)")
-# # print(f"Prawy dolny róg: ({height-1}, {width-1})")
-# r = np.sqrt(height**2 + width**2) / 2
-# centery = (width // 2)-1
-# centerx = (height // 2)-1
-# print(r)
-
-
-
-# frm = ttk.Frame(root, padding=10)
-# frm.grid()
-# ttk.Label(frm, text = "Hello World!").grid(column=100, row=100)
-# ttk.Button(frm, text="Test Sinogram", command=lambda: createSinogram(image)).grid(column=2,row=2)
-# ttk.Button(frm, text="Quit", command = root.destroy).grid(column=1, row=0)
