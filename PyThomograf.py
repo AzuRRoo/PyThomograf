@@ -10,7 +10,6 @@ import tkinter as tk
 from tkinter import ttk
 import pydicom
 from tkinter import filedialog
-import datetime
 import pydicom.uid
 from tkcalendar import Calendar
 from datetime import datetime
@@ -18,6 +17,7 @@ from pydicom.uid import SecondaryCaptureImageStorage
 import pydicom
 from pydicom.dataset import Dataset, FileDataset
 from sklearn.metrics import mean_squared_error
+from time import sleep
 
 def Bresenham(x0,y0,x1,y1):
     dx = abs(x1 - x0)
@@ -41,6 +41,10 @@ def Bresenham(x0,y0,x1,y1):
 
 
     return zip(*points)
+#TRZEBA dodać porównanie błędu średniokwadratowego dla obrazu wejsciowego i zrekonstruowanego 
+#Dla roznych wartosci parametrow 
+#o zmianę błędu średniokwadratowego przy zwiększaniu dokładności
+#próbkowania (trzy uprzednio wymienione parametry modelu emiter/detektor),
 
 def bladSrednioKwadratowy(RMSEList,image_empty,image):
     normImage = image_empty.copy()
@@ -54,6 +58,7 @@ def bladSrednioKwadratowy(RMSEList,image_empty,image):
     rmse = np.sqrt(mse)
     RMSEList.append(rmse)
     return RMSEList
+
 def rekonstruct(image_empty, sinogram, alpha, r, centerx, centery, filter, steps, n, l,image):
 
     liczbaEm = n
@@ -77,7 +82,8 @@ def rekonstruct(image_empty, sinogram, alpha, r, centerx, centery, filter, steps
         filtered_sinogram = np.array(filtered_sinogram)
         sinogram = filtered_sinogram
     num_angles = sinogram.shape[0]
-    
+    print(num_angles)
+    sleep(10)
     for j in range(num_angles):
         angle = j * alpha 
         for i in range(liczbaEm):
@@ -155,7 +161,8 @@ def createSinogram(image, centerx,centery,height,width,r, filter,steps,n,l,alpha
     scan_1d_values = []
     liczbaEm=n
     deep=copy.deepcopy(image)
-    for j in range(0, 181,alpha):#Ustawienie detektorow
+    sleep(2)
+    for j in np.arange(0, 181,alpha):#Ustawienie detektorow
         emitter_scan = []
         image_copy = gray2rgb(deep)
         for i in range(0, liczbaEm):#Polozenie jednego detektora dla danego ustawienia detektorow
@@ -184,9 +191,9 @@ def createSinogram(image, centerx,centery,height,width,r, filter,steps,n,l,alpha
                 else:
                     image_copy[rr, cc] = [255,255,255]
 
-        if(steps):
+        if(steps and int(round(j,0))%4==0):
             plt.imshow(image_copy)
-            plt.title(f"Linia dla j={j}")
+            plt.title(f"Linia dla j={round(j,0)}")
             plt.axis("off")
             plt.pause(0.001)
             plt.clf()
@@ -208,9 +215,9 @@ def createSinogram(image, centerx,centery,height,width,r, filter,steps,n,l,alpha
     image_empty = np.zeros((image.shape[0],image.shape[1]),dtype=float)
     copy2 = copy.deepcopy(image)
     if filter:
-        copy2,RMSEListFiltered = rekonstruct(image_empty, np.array(scan_1d_values), 1, r, centerx, centery, filter, steps,n,l,image)
+        copy2,RMSEListFiltered = rekonstruct(image_empty, np.array(scan_1d_values), alpha, r, centerx, centery, filter, steps,n,l,image)
     else:
-        copy2,RMSEList = rekonstruct(image_empty, np.array(scan_1d_values), 1, r, centerx, centery, filter, steps,n,l,image)
+        copy2,RMSEList = rekonstruct(image_empty, np.array(scan_1d_values), alpha, r, centerx, centery, filter, steps,n,l,image)
     if dicom:
         saveDicom(copy2,filename = imageChoiceDicom.get())
     # plt.figure(figsize=(8, 8))
@@ -229,7 +236,6 @@ def createSinogram(image, centerx,centery,height,width,r, filter,steps,n,l,alpha
 # image = imread("Paski2.jpg")#❌ #Caly czarny obraz
 # image = imread("Shepp_logan.jpg")#✅ Nieco wyblakle
 #PROSTOKATY
-# image = imread("cos.jpg") #❌ -> widac kulke jednakze nie ma  bialego paska
 # image = imread("CT_ScoutView-large.jpg")#✅
 # image = imread("CT_ScoutView.jpg")#✅
 
@@ -237,7 +243,7 @@ def createSinogram(image, centerx,centery,height,width,r, filter,steps,n,l,alpha
 # image = imread("SADDLE_PE.jpg")#❌ -> caly czarny obraz
 
 def RMSEChart(RMSEList,Usefilter):
-    plt.scatter(range(len(RMSEList)), RMSEList, s = 10)
+    plt.scatter(range(len(RMSEList)), RMSEList, s = 5)
     plt.xlabel("Iteracja (kąt)")
     plt.ylabel("Błąd średniokwadratowy (RMSE)")
     if Usefilter:
@@ -257,7 +263,7 @@ def app(image, dicom=False):
     n = nChoice.get()#Liczba Emiterow
 
     l = lChoice.get()#Rozpietosc kątowa
-
+    n = 300
     Usefilter = filterChoice.get()
 
     Showsteps = stepsChoice.get()
@@ -453,10 +459,12 @@ paramsFrame = tk.Frame(root)
 paramsFrame.grid(row=3, column=0, pady=10, rowspan=2)
 
 
-alphaChoice = tk.IntVar(value=1)
+
+alphaChoice = tk.DoubleVar()
 alphaLabel = tk.Label(paramsFrame, text="Alpha")
 alphaLabel.grid(row=0, column=0, padx=10, pady=1)
-alphaSlider = tk.Scale(paramsFrame, variable=alphaChoice,from_=1,to_=10,orient="horizontal")
+# alphaSlider = tk.Scale(paramsFrame, variable=alphaChoice,from_=1,to_=10,orient="horizontal")
+alphaSlider = tk.Scale(root, variable=alphaChoice, from_=0.1, to=5, orient="horizontal", resolution=0.1)
 alphaSlider.grid(row=0, column=1, padx=10, pady=1)
 
 
