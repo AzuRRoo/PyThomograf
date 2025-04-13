@@ -237,7 +237,7 @@ def createSinogram(image, centerx,centery,height,width,r, filter,steps,n,l,alpha
 # image = imread("SADDLE_PE.jpg")#❌ -> caly czarny obraz
 
 def RMSEChart(RMSEList,Usefilter):
-    plt.plot(RMSEList)
+    plt.scatter(range(len(RMSEList)), RMSEList, s = 10)
     plt.xlabel("Iteracja (kąt)")
     plt.ylabel("Błąd średniokwadratowy (RMSE)")
     if Usefilter:
