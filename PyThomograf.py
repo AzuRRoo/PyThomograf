@@ -82,8 +82,6 @@ def rekonstruct(image_empty, sinogram, alpha, r, centerx, centery, filter, steps
         filtered_sinogram = np.array(filtered_sinogram)
         sinogram = filtered_sinogram
     num_angles = sinogram.shape[0]
-    print(num_angles)
-    sleep(10)
     for j in range(num_angles):
         angle = j * alpha 
         for i in range(liczbaEm):
@@ -243,6 +241,7 @@ def createSinogram(image, centerx,centery,height,width,r, filter,steps,n,l,alpha
 # image = imread("SADDLE_PE.jpg")#❌ -> caly czarny obraz
 
 def RMSEChart(RMSEList,Usefilter):
+    print("OSTATNI:",RMSEList[-1])
     plt.scatter(range(len(RMSEList)), RMSEList, s = 5)
     plt.xlabel("Iteracja (kąt)")
     plt.ylabel("Błąd średniokwadratowy (RMSE)")
@@ -263,7 +262,6 @@ def app(image, dicom=False):
     n = nChoice.get()#Liczba Emiterow
 
     l = lChoice.get()#Rozpietosc kątowa
-    n = 300
     Usefilter = filterChoice.get()
 
     Showsteps = stepsChoice.get()
