@@ -72,18 +72,18 @@ def rekonstruct(image_empty, sinogram, alpha, r, centerx, centery, filter, steps
         for projection in sinogram:
             filtered_projection = filtr(projection)
             filtered_sinogram.append(filtered_projection)
-        plt.figure(figsize=(10, 5))
-        plt.imshow(filtered_sinogram, cmap='gray')
-        plt.title("Sinogram po filtracji")
-        plt.xlabel("Pozycja detektora (kąty)")
-        plt.ylabel("Pozycja detektora (projekcje)")
-        plt.colorbar(label="Suma wartości pikseli")
-        plt.show()
+        # plt.figure(figsize=(10, 5))
+        # plt.imshow(filtered_sinogram, cmap='gray')
+        # plt.title("Sinogram po filtracji")
+        # plt.xlabel("Pozycja detektora (kąty)")
+        # plt.ylabel("Pozycja detektora (projekcje)")
+        # plt.colorbar(label="Suma wartości pikseli")
+        # plt.show()
         filtered_sinogram = np.array(filtered_sinogram)
         sinogram = filtered_sinogram
     num_angles = sinogram.shape[0]
-    print(num_angles)
-    sleep(10)
+    #print(num_angles)
+    #sleep(10)
     for j in range(num_angles):
         angle = j * alpha 
         for i in range(liczbaEm):
@@ -118,12 +118,12 @@ def rekonstruct(image_empty, sinogram, alpha, r, centerx, centery, filter, steps
             RMSEList = bladSrednioKwadratowy(RMSEList,image_empty,image)
         
 
-        if steps:
-            plt.imshow(image_empty, cmap='gray')
-            plt.title(f"Krok pośredni rekonstrukcji: kąt {j * alpha}°")
-            plt.axis("off")
-            plt.pause(0.01)
-            plt.clf()
+        # if steps:
+        #     plt.imshow(image_empty, cmap='gray')
+        #     plt.title(f"Krok pośredni rekonstrukcji: kąt {j * alpha}°")
+        #     plt.axis("off")
+        #     plt.pause(0.01)
+        #     plt.clf()
     # Normalizacja zrekonstruowanego obrazu do zakresu 0-255
     image_empty -= np.min(image_empty)
     if np.max(image_empty) != 0:
@@ -191,12 +191,12 @@ def createSinogram(image, centerx,centery,height,width,r, filter,steps,n,l,alpha
                 else:
                     image_copy[rr, cc] = [255,255,255]
 
-        if(steps): #Co piąty wyswietla do przyspieszenia do kodu
-            plt.imshow(image_copy)
-            plt.title(f"Linia dla j={round(j,0)}")
-            plt.axis("off")
-            plt.pause(0.001)
-            plt.clf()
+        # if(steps):
+        #     plt.imshow(image_copy)
+        #     plt.title(f"Linia dla j={round(j,0)}")
+        #     plt.axis("off")
+        #     plt.pause(0.001)
+        #     plt.clf()
 
 
 
@@ -204,13 +204,13 @@ def createSinogram(image, centerx,centery,height,width,r, filter,steps,n,l,alpha
 
 
 
-    plt.figure(figsize=(10, 5))
-    plt.imshow(scan_1d_values, cmap='gray')
-    plt.title("Sinogram")
-    plt.xlabel("Pozycja detektora (kąty)")
-    plt.ylabel("Pozycja detektora (projekcje)")
-    plt.colorbar(label="Suma wartości pikseli")
-    plt.show()
+    # plt.figure(figsize=(10, 5))
+    # plt.imshow(scan_1d_values, cmap='gray')
+    # plt.title("Sinogram")
+    # plt.xlabel("Pozycja detektora (kąty)")
+    # plt.ylabel("Pozycja detektora (projekcje)")
+    # plt.colorbar(label="Suma wartości pikseli")
+    # plt.show()
 
     image_empty = np.zeros((image.shape[0],image.shape[1]),dtype=float)
     copy2 = copy.deepcopy(image)
@@ -222,9 +222,9 @@ def createSinogram(image, centerx,centery,height,width,r, filter,steps,n,l,alpha
         saveDicom(copy2,filename = imageChoiceDicom.get())
     # plt.figure(figsize=(8, 8))
 
-    plt.imshow(copy2,cmap="gray")
-    plt.colorbar()
-    plt.show()
+    # plt.imshow(copy2,cmap="gray")
+    # plt.colorbar()
+    # plt.show()
     if filter:
         return RMSEListFiltered
     else:
@@ -252,27 +252,38 @@ def RMSEChart(RMSEList,Usefilter):
         plt.title("Zmiana błędu RMSE w czasie rekonstrukcji bez filtrowania sinogramu")
     plt.show()
 
+
 def app(image, dicom=False):
-    height,width = image.shape[:2]
-    r = np.sqrt(height**2 + width**2) / 2
-    centery = (width // 2)-1
-    centerx = (height // 2)-1
+    #n=90
+    l=45
+    while l<271:
+        height,width = image.shape[:2]
+        r = np.sqrt(height**2 + width**2) / 2
+        centery = (width // 2)-1
+        centerx = (height // 2)-1
 
-    alpha = alphaChoice.get()
+        alpha = alphaChoice.get()
+        #alpha=1.0
+        n = nChoice.get()#Liczba Emiterow
 
-    n = nChoice.get()#Liczba Emiterow
+        #l = lChoice.get()#Rozpietosc kątowa
+        #n = 300
+        Usefilter = filterChoice.get()
 
-    l = lChoice.get()#Rozpietosc kątowa
-    n = 300
-    Usefilter = filterChoice.get()
+        Showsteps = stepsChoice.get()
+        if Usefilter:
+            print(l)
+            RMSEListFiltered = createSinogram(image,centerx,centery,height,width,r,Usefilter,Showsteps,n, l, alpha, dicom)
+            print(RMSEListFiltered[-1])
+        # RMSEChart(RMSEListFiltered,Usefilter)
+        else:
+            print(l)
+            RMSEList = createSinogram(image,centerx,centery,height,width,r,Usefilter,Showsteps,n, l, alpha, dicom)
+            print(RMSEList[-1])
 
-    Showsteps = stepsChoice.get()
-    if Usefilter:
-        RMSEListFiltered = createSinogram(image,centerx,centery,height,width,r,Usefilter,Showsteps,n, l, alpha, dicom)
-        RMSEChart(RMSEListFiltered,Usefilter)
-    else:
-        RMSEList = createSinogram(image,centerx,centery,height,width,r,Usefilter,Showsteps,n, l, alpha, dicom)
-        RMSEChart(RMSEList,Usefilter)
+                
+                #RMSEChart(RMSEList,Usefilter)
+        l+=45
 
 
 def loadImage():
@@ -281,7 +292,7 @@ def loadImage():
         try:
             full_path = os.path.join("Images", selected_filename)
             image = imread(full_path)
-            print(f"Image shape: {image.shape}")
+            #print(f"Image shape: {image.shape}")
             if len(image.shape) == 3:
                 image = rgb2gray(image)
             app(image)
