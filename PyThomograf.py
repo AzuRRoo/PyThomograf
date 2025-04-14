@@ -135,9 +135,9 @@ def rekonstruct(image_empty, sinogram, alpha, r, centerx, centery, filter, steps
         return image_empty.astype(np.uint8),RMSEList
         
 def filtr(sinogram):
-    hardcoded = len(sinogram)#do poprawy edycji 
+    wielkosc = len(sinogram)
     mask = []
-    for k in range(-hardcoded//2,hardcoded//2 +1):
+    for k in range(-wielkosc//2,wielkosc//2 +1):
         if k == 0:
             mask.append(1)
         else:
@@ -191,7 +191,7 @@ def createSinogram(image, centerx,centery,height,width,r, filter,steps,n,l,alpha
                 else:
                     image_copy[rr, cc] = [255,255,255]
 
-        if(steps and int(round(j,0))%4==0):
+        if(steps): #Co piąty wyswietla do przyspieszenia do kodu
             plt.imshow(image_copy)
             plt.title(f"Linia dla j={round(j,0)}")
             plt.axis("off")
@@ -326,7 +326,7 @@ def saveDicom(image, filename):
     gender_dicom = "M" if gender == "Mężczyzna" else "F" if gender == "Kobieta" else ""
     date = calendar.get_date().replace("-", "")
     date_parts = date.split('/')
-    formatted_date = f"20{date_parts[2]}{date_parts[0].zfill(2)}{date_parts[1].zfill(2)}"  # Format to 'YYYYMMDD'
+    formatted_date = f"20{date_parts[2]}{date_parts[0].zfill(2)}{date_parts[1].zfill(2)}"
     comment = descriptionText.get("1.0", "end").strip()
 
     ds.SOPClassUID = SecondaryCaptureImageStorage
@@ -458,31 +458,35 @@ btnDicom.grid(row=1, column=0, pady=5)
 paramsFrame = tk.Frame(root)
 paramsFrame.grid(row=3, column=0, pady=10, rowspan=2)
 
-
+def update_alpha_label(value):
+    alpha=float(value)
+    ilosc=round(180/alpha,0)
+    alphaValueLabel.config(text=f"Ilosc Skanów: {ilosc}")
 
 alphaChoice = tk.DoubleVar()
 alphaLabel = tk.Label(paramsFrame, text="Alpha")
 alphaLabel.grid(row=0, column=0, padx=10, pady=1)
 # alphaSlider = tk.Scale(paramsFrame, variable=alphaChoice,from_=1,to_=10,orient="horizontal")
-alphaSlider = tk.Scale(root, variable=alphaChoice, from_=0.1, to=5, orient="horizontal", resolution=0.1)
+alphaSlider = tk.Scale(paramsFrame, variable=alphaChoice, from_=0.1, to=2, orient="horizontal", resolution=0.05,command=update_alpha_label,width=20,length=250)
 alphaSlider.grid(row=0, column=1, padx=10, pady=1)
+alphaValueLabel = tk.Label(paramsFrame, text=f"Ilosc Skanów: {180/alphaChoice.get()}")
+alphaValueLabel.grid(row=0, column=2, padx=10)
 
 
 nChoice = tk.IntVar(value=1)
 nLabel = tk.Label(paramsFrame, text="Liczba detektorów")
 nLabel.grid(row=1, column=0, padx=10, pady=1)
-nSlider = tk.Scale(paramsFrame,variable=nChoice,from_=1,to_=180,orient="horizontal")
+nSlider = tk.Scale(paramsFrame,variable=nChoice,from_=30,to_=720,orient="horizontal",resolution=5,width=20,length=250)
 nSlider.grid(row=1, column=1, padx=10, pady=5)
 
 
 lChoice = tk.IntVar(value=1)
 lLabel = tk.Label(paramsFrame, text="Rozpiętość kątowa")
 lLabel.grid(row=2, column=0, padx=10, pady=1)
-lSlider = tk.Scale(paramsFrame,variable=lChoice,from_=1,to_=90,orient="horizontal")
+lSlider = tk.Scale(paramsFrame,variable=lChoice,from_=1,to_=270,orient="horizontal",resolution=1,width=20,length=250)
 lSlider.grid(row=2, column=1, padx=10, pady=5)
 
 filterChoice = tk.BooleanVar(value=False)
-
 filterCheckbox = ttk.Checkbutton(paramsFrame, text="Filtr", variable=filterChoice)
 filterCheckbox.grid(row=3, column=0, columnspan=2, padx=10, pady=5)
 
